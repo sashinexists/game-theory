@@ -1,149 +1,160 @@
+"use strict";
+
+//tit for tat sometimes returns undefined, definitely look into this, also the speed problem. Also delete this comment ASAP.
 class Organism {
-    constructor(strategy, size) {
+    constructor(species) {
+        this.species = species;
+        this.strategy = this.species.strategy;
+        this.history = [];
+    }
+
+    engage(rival) {
+        const TURNS = Math.random()*10;
+        for (let i=0; i<TURNS; i++) {
+            this.interact(rival);
+        }
+    }
+
+    interact(rival) {
+        this.action = this.strategy(this.history, rival.history);
+        this.blunder();
+        this.updateHistory();
+        if(this.history.length>rival.history.length) {rival.interact(this)};
+    }
+
+    blunder() {
+        const CHANCE_OF_MISTAKE = .05;
+        this.action = probability(1-CHANCE_OF_MISTAKE) ? this.action : !this.action;
+    }
+
+    updateHistory() {
+        this.history.push(this.action);
+    }
+
+    struggle(populations) {
+        let score = 0;
+        for (let i=0; i<this.species.population; i++) {
+            for (let species in populations) {
+                const rival = new Organism(populations[species]);
+                this.engage(rival);
+                score += getRoundPayoff(this, rival);
+            }
+        }
+        return score;
+    }
+}
+
+class Species {
+    constructor(strategy, population) {
         this.strategy = strategy;
-        this.size = size;
-    }
-}
-
-function init(strategy1, strategy2) {
-    const populations = {
-        titForTat: new Organism((history, enemyHistory) => {return history.length===0 ? true : enemyHistory[enemyHistory.length-1]}, 10),
-        alwaysCooperate: new Organism(()=>true, 10),
-        neverCooperate: new Organism(()=>false, 10),
-        holdGrudge: new Organism((history, enemyHistory)=>history.length === 0 ? true : !enemyHistory.some(action => !action), 10),
-        titForDoubleTat: new Organism((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2], 10),
-        titForTripleTat: new Organism((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2] || enemyHistory[enemyHistory.length-3], 10),
-        karmaIsABitch: new Organism((history, enemyHistory) => history.length === 0 ? true : probability(enemyHistory.filter(action=>action).length/enemyHistory.length), 10),
-        tatForTit: new Organism((history, enemyHistory) => {return history.length===0 ? true : !enemyHistory[enemyHistory.length-1]}, 10),
-        random: new Organism(()=>!!Math.round(Math.random()), 10),
-        //tenPercent: new Organism(()=>probability(0.1), 10)
+        this.population = population;
     }
 
-    //console.log("Against a random strategy, the best strategy is "+vsRandom(populations));
-    //console.log(`Against the population, the best strategy is ${vsPopulation(populations)}`);
-    
-    evolution(populations);
-
-    return "There you go...";
-}
-
-function evolution(populations) {
-    let highest;
-    let lowest;
-    let winner;
-    let loser;
-    for (let i = 0; i<100; i++) {
-        results = vsPopulationV2(populations);
-        if(i%10 === 0) {
-            console.log("\nTime "+i+"\n");
-            results.forEach(result=>console.log(`${result[0]}: ${populations[result[0]].size}`));
-        }
-        results.forEach(result=>populations[result[0]].size =Math.floor(populations[result[0]].size));
-        highest = results.reduce((output, result)=> output = result[1]>output? result[1]:output, 0);
-        lowest = results.reduce((output, result)=> output = result[1]<output? result[1]:output, highest);
-        winner = results.find(result=>result[1]===highest)[0];
-        loser = results.find(result=>result[1]===lowest)[0];
-        populations[winner].size *= 2;
-        populations[loser].size /= 2;
+    growPopulation() {
+        this.population *= 2;
     }
-}
 
-function vsRandom(populations) {
-    let highestScore = 0;
-    let bestStrategy;
-    for (var population in populations) {
-        let {strategy, size} = populations[population];
-        let score = 0;
-        for (let i = 0; i<size; i++) {
-            score += play(strategy, populations["random"].strategy)[0];           
-        }
-        console.log(population+": "+score);
-        bestStrategy = score > highestScore ? population : bestStrategy;
-        highestScore = bestStrategy === population ? score : highestScore; 
+    declinePopulation() {
+        this.population = Math.floor(this.population / 2);
     }
-    return bestStrategy;
+
 }
 
-function vsPopulation(populations) {
-    let highestScore = 0;
-    let bestStrategy;
-    for (var player in populations) {
-        let score = 0;
-        let {size} = populations[player];
-        for (let i = 0; i<size; i++) {
-            for (let rival in populations) {
-                let rivalSize = populations[rival].size;
-                for (let j = 0; j<rivalSize; j++) {
-                    score+= play(populations[player].strategy, populations[rival].strategy)[0];
-                }
+function init() {
+    const POPULATIONS = {
+        //titForTat: new Species((history, enemyHistory) => {return history.length===0 ? true : enemyHistory[enemyHistory.length-1]}, 10),
+        alwaysCooperate: new Species(()=>true, 10),
+        neverCooperate: new Species(()=>false, 10),
+        holdGrudge: new Species((history, enemyHistory)=>history.length === 0 ? true : !enemyHistory.some(action => !action), 10),
+        titForDoubleTat: new Species((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2], 10),
+        titForTripleTat: new Species((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2] || enemyHistory[enemyHistory.length-3], 10),
+        karmaIsABitch: new Species((history, enemyHistory) => history.length === 0 ? true : probability(enemyHistory.filter(action=>action).length/enemyHistory.length), 10),
+        tatForTit: new Species((history, enemyHistory) => history.length===0 ? true : !enemyHistory[enemyHistory.length-1], 10),
+        random: new Species(()=>probability(0.5), 10)
+    }
+
+    const ECOSYSTEM = {
+        populations: POPULATIONS,
+
+        evolve() {
+            for (let generation=1; generation<101; generation++) {
+                console.log(`\nGeneration ${generation}\n`);
+                this.printStatus();
+                const OUTCOME = getOutcome(this.compete());
+                this.populations[OUTCOME.winner].growPopulation();
+                this.populations[OUTCOME.loser].declinePopulation();
+            }
+        },
+
+        compete() {
+            const RESULTS = {};
+            for (let species in this.populations) {
+                const organism = new Organism(this.populations[species]);
+                console.log(organism);
+                console.log(`SPECIES STRATEGY: ${organism.species.strategy}`)
+                RESULTS[species] = organism.struggle(this.populations);
+            }
+            return RESULTS;
+        },
+
+        printStatus() {
+            for (let species in this.populations) {
+                console.log(`${species}: ${this.populations[species].population}`);
             }
         }
-        console.log(`${player}: ${score}`);
-        bestStrategy = score > highestScore ? player : bestStrategy;
-        highestScore = bestStrategy === player ? score : highestScore;
     }
-    return bestStrategy;
+
+    return ECOSYSTEM.evolve();
 }
 
-function vsPopulationV2(populations) {
-    let highestScore = 0;
-    let bestStrategy;
-    let output = [];
-    for (var player in populations) {
-        let score = 0;
-        let {size} = populations[player];
-        for (let i = 0; i<size; i++) {
-            for (let rival in populations) {
-                let rivalSize = populations[rival].size;
-                for (let j = 0; j<rivalSize; j++) {
-                    score+= play(populations[player].strategy, populations[rival].strategy)[0];
-                }
-            }
+function getOutcome(results) {
+    const winner = getWinner(results);
+    const loser = getLoser(results);
+    return {winner, loser};
+}
+
+function getWinner(results) {
+    let winner = Object.keys(results)[0];
+    let highestScore = results[Object.keys(results)[0]];;
+    for (let result in results) {
+        if (results[result]>highestScore) {
+            highestScore = results[result];
+            winner = result;
         }
-        output.push([player, score/populations[player].size]);
     }
-    return output;
+    return winner;
 }
 
-
-function play(strategy1, strategy2) {
-    const history1 = [];
-    const history2 = [];
-    const turns = Math.random()*10;
-    let score1 = 0;
-    let score2 = 0;
-    const cheat = 2//10;
-    const cheated = -2//-10;
-    const cooperate = 1//5;
-    const compete = -1//-5;
-    for (var i = 0; i<turns; i++) {
-        let action1 = strategy1(history1, history2);
-        let action2 = strategy2(history2, history1);
-        action1 = probability(.95)?action1:!action1;
-        action2 = probability(.95)?action2:!action2;
-        history1.push(action1);
-        history2.push(action2);
-        if(action1&&action2) {
-            score1 +=cooperate;
-            score2 +=cooperate;
-        } else if(!action1&&!action2) {
-            score1 +=compete;
-            score2 +=compete;
-        } else if(action1&&!action2) {
-            score1 += cheated;
-            score2 += cheat;
-        } else if(!action1&&action2) {
-            score1 += cheat;
-            score2 += cheated;
+function getLoser(results) {
+    let loser = Object.keys(results)[0];
+    let lowestScore = results[Object.keys(results)[0]];
+    for (let result in results) {
+        if (results[result]<lowestScore && results[result]!==0) {
+            lowestScore = results[result];
+            loser = result;
         }
-        //console.log(action1);
     }
-    return [score1, score2];
+    return loser;
 }
+
+function getRoundPayoff(organism, rival) {
+    const PAYOFFS = {cheat:10, cheated:-10, cooperate:5, compete:-5};
+    const {cooperate, cheat, cheated, compete} = PAYOFFS;
+    if (organism.action && rival.action) {
+        return cooperate;
+    } else if (organism.action && !rival.action) {
+        return cheated;
+    } else if (!organism.action && rival.action) {
+        return cheat;
+    } else if (!organism.action && !rival.action) {
+        return compete;
+    }
+}
+
 
 function probability(chance) {
     return Math.random()<chance;
 }
 
 
-init();
+console.log(init());
