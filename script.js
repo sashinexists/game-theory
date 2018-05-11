@@ -1,25 +1,44 @@
 "use strict";
 
-//tit for tat sometimes returns undefined, definitely look into this, also the speed problem. Also delete this comment ASAP.
 class Organism {
     constructor(species) {
         this.species = species;
-        this.strategy = this.species.strategy;
+        this.strategy = species.strategy;
         this.history = [];
+    }
+    
+    struggle(populations) {
+        let score = 0;
+        for (let species in populations) {
+            for (let i=0; i<populations[species].population; i++) {
+                const rival = new Organism(populations[species]);
+                score += this.engage(rival);
+                this.resetHistory();
+            }
+        }
+        return score;
     }
 
     engage(rival) {
+        let score = 0;
         const TURNS = Math.random()*10;
         for (let i=0; i<TURNS; i++) {
-            this.interact(rival);
+            this.encounter(rival);
+            score += getRoundPayoff(this, rival);
         }
+        return score;
+    }
+
+    encounter(rival) {
+        this.interact(rival);
+        rival.interact(this);
+        this.updateHistory()
+        rival.updateHistory();
     }
 
     interact(rival) {
         this.action = this.strategy(this.history, rival.history);
         this.blunder();
-        this.updateHistory();
-        if(this.history.length>rival.history.length) {rival.interact(this)};
     }
 
     blunder() {
@@ -31,17 +50,10 @@ class Organism {
         this.history.push(this.action);
     }
 
-    struggle(populations) {
-        let score = 0;
-        for (let i=0; i<this.species.population; i++) {
-            for (let species in populations) {
-                const rival = new Organism(populations[species]);
-                this.engage(rival);
-                score += getRoundPayoff(this, rival);
-            }
-        }
-        return score;
+    resetHistory() {
+        this.history = [];
     }
+
 }
 
 class Species {
@@ -62,14 +74,14 @@ class Species {
 
 function init() {
     const POPULATIONS = {
-        //titForTat: new Species((history, enemyHistory) => {return history.length===0 ? true : enemyHistory[enemyHistory.length-1]}, 10),
+        titForTat: new Species((history, rivalHistory) => {return history.length===0 ? true : rivalHistory[rivalHistory.length-1]}, 10),
         alwaysCooperate: new Species(()=>true, 10),
         neverCooperate: new Species(()=>false, 10),
-        holdGrudge: new Species((history, enemyHistory)=>history.length === 0 ? true : !enemyHistory.some(action => !action), 10),
-        titForDoubleTat: new Species((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2], 10),
-        titForTripleTat: new Species((history, enemyHistory)=> history.length === 0 ? true : enemyHistory[enemyHistory.length-1] || enemyHistory[enemyHistory.length-2] || enemyHistory[enemyHistory.length-3], 10),
-        karmaIsABitch: new Species((history, enemyHistory) => history.length === 0 ? true : probability(enemyHistory.filter(action=>action).length/enemyHistory.length), 10),
-        tatForTit: new Species((history, enemyHistory) => history.length===0 ? true : !enemyHistory[enemyHistory.length-1], 10),
+        holdGrudge: new Species((history, rivalHistory)=>history.length === 0 ? true : !rivalHistory.some(action => !action), 10),
+        titForDoubleTat: new Species((history, rivalHistory)=> history.length === 0 ? true : rivalHistory[rivalHistory.length-1] || rivalHistory[rivalHistory.length-2], 10),
+        titForTripleTat: new Species((history, rivalHistory)=> history.length === 0 ? true : rivalHistory[rivalHistory.length-1] || rivalHistory[rivalHistory.length-2] || rivalHistory[rivalHistory.length-3], 10),
+        karmaIsABitch: new Species((history, rivalHistory) => history.length === 0 ? true : probability(rivalHistory.filter(action=>action).length/rivalHistory.length), 10),
+        tatForTit: new Species((history, rivalHistory) => history.length===0 ? true : !rivalHistory[rivalHistory.length-1], 10),
         random: new Species(()=>probability(0.5), 10)
     }
 
@@ -89,10 +101,10 @@ function init() {
         compete() {
             const RESULTS = {};
             for (let species in this.populations) {
-                const organism = new Organism(this.populations[species]);
-                console.log(organism);
-                console.log(`SPECIES STRATEGY: ${organism.species.strategy}`)
-                RESULTS[species] = organism.struggle(this.populations);
+                for(let i=0; i<this.populations[species].population; i++) {
+                    const organism = new Organism(this.populations[species]);
+                    RESULTS[species] = organism.struggle(this.populations);
+                }
             }
             return RESULTS;
         },
@@ -157,4 +169,4 @@ function probability(chance) {
 }
 
 
-console.log(init());
+init();
