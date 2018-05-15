@@ -42,7 +42,7 @@ class Organism {
     }
 
     blunder() {
-        const CHANCE_OF_MISTAKE = .05;
+        const CHANCE_OF_MISTAKE = .01;
         this.action = probability(1-CHANCE_OF_MISTAKE) ? this.action : !this.action;
     }
 
